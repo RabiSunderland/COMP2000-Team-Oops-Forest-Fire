@@ -1,5 +1,6 @@
 import java.awt.event.*;
 import javax.swing.JFrame;
+import javax.swing.Timer;
 
 public class ForestSimulation implements KeyListener {
 
@@ -10,6 +11,11 @@ public class ForestSimulation implements KeyListener {
 
     private ForestPanel panel;
     private JFrame frame;
+    private Timer fireTimer;
+
+    // How often the fire advances, in milliseconds. Slower than a redraw
+    // tick so the spread is watchable rather than instant.
+    private static final int FIRE_STEP_MS = 500;
 
     public ForestSimulation(){
         //forest
@@ -31,6 +37,15 @@ public class ForestSimulation implements KeyListener {
         frame.addKeyListener(this);
         frame.setFocusable(true);
         frame.setVisible(true);
+
+        // Advance the fire on a timer rather than only when a key is
+        // pressed, so it spreads on its own while the player is moving
+        // water around. fire.spread() is currently a stub
+        fireTimer = new Timer(FIRE_STEP_MS, e -> {
+            fire.spread(forest);
+            panel.repaint();
+        });
+        fireTimer.start();
     }
 
     public void startRandomFire() {

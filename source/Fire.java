@@ -7,4 +7,8 @@ public class Fire {
         }
     }
 
+    public void spread(Forest forest) {
+        // Needs to be done
+    }
+
 }
