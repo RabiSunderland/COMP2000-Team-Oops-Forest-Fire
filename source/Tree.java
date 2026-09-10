@@ -1,4 +1,4 @@
-// Creating the states for tree
+// Represents a tree and controls its current state.
 public class Tree {
 
     private TreeState state;
@@ -8,14 +8,20 @@ public class Tree {
     }
 
     public void burn() {
-        if (isGreen()) {
-            state = TreeState.BURNING;
-        }
+        changeState(TreeState.BURNING);
     }
 
     public void extinguish() {
-        if (isBurning()) {
-            state = TreeState.BURNED;
+        changeState(TreeState.BURNED);
+    }
+
+    public void regrow() {
+        changeState(TreeState.GREEN);
+    }
+
+    private void changeState(TreeState newState) {
+        if (state.canTransitionTo(newState)) {
+            state = newState;
         }
     }
 
