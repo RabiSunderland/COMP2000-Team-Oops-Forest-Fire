@@ -33,9 +33,9 @@ public class Water {
         }
     }
 
-    public void extinguish(Tree tree) {
-        if (tree.getState() == TreeState.BURNING) {
-            tree.extinguish();
+    public void extinguish(Extinguishable target) {
+        if (target.isBurning()) {
+            target.extinguish();
         }
     }
 

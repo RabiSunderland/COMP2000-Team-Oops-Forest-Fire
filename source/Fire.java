@@ -9,7 +9,7 @@ public class Fire {
     };
 
     // Chance that a given green neighbour (tree) catches fire on any one tick.
-    private static final double SPREAD_CHANCE = 0.20;
+    private static final double SPREAD_CHANCE = 0.25;
 
     public void startFire(Tree tree) {
 

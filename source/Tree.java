@@ -1,5 +1,5 @@
 // Represents a tree and controls its current state.
-public class Tree {
+public class Tree implements Extinguishable {
 
     private TreeState state;
 
