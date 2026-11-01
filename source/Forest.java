@@ -1,4 +1,3 @@
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -18,11 +17,6 @@ public class Forest {
 
     private final Grid<Tree> trees; // grid of trees
 
-    // Generic collection: keeps track of every tree that is currently on
-    // fire, so the rest of the program doesn't need to scan the whole grid
-    // to find them.
-    private List<Tree> burningTrees;
-
     // Observers interested in what happens to the trees.
     private final List<ForestListener> listeners = new CopyOnWriteArrayList<>();
 
@@ -33,7 +27,6 @@ public class Forest {
         Random random = new Random();
         trees = new Grid<>(rows, columns,
                 (row, col) -> SPECIES.get(random.nextInt(SPECIES.size())).get());
-        burningTrees = new ArrayList<>();
     }
 
     /**
@@ -80,29 +73,18 @@ public class Forest {
                         Collectors.counting()));
     }
 
-    /**
-     * Records that a tree has started burning, so it shows up in
-     * getBurningTrees(). Safe to call more than once for the same tree.
-     */
+    /** Tells listeners that a tree has started burning. */
     public void reportBurning(Tree tree) {
-        if (!burningTrees.contains(tree)) {
-            burningTrees.add(tree);
-            notifyListeners(ForestEvent.Type.IGNITED, tree);
-        }
+        notifyListeners(ForestEvent.Type.IGNITED, tree);
     }
 
-    /**
-     * Records that a tree is no longer burning (e.g. extinguished),
-     * removing it from the tracked list.
-     */
+    /** Tells listeners that the player put a burning tree out. */
     public void reportExtinguished(Tree tree) {
-        burningTrees.remove(tree);
         notifyListeners(ForestEvent.Type.EXTINGUISHED, tree);
     }
 
     /** Records that a tree finished burning without help from the player. */
     public void reportBurnedOut(Tree tree) {
-        burningTrees.remove(tree);
         notifyListeners(ForestEvent.Type.BURNED_OUT, tree);
     }
 
@@ -125,8 +107,16 @@ public class Forest {
         listeners.forEach(listener -> listener.onForestEvent(event));
     }
 
+    /**
+     * Every tree that is on fire right now. Worked out from the trees
+     * themselves each time, so there is only one source of truth for whether
+     * a tree is burning (previously a separate list had to be kept in sync).
+     */
     public List<Tree> getBurningTrees() {
-        return burningTrees;
+        return trees.cells()
+                .map(GridCell::value)
+                .filter(Tree::isBurning)
+                .toList();
     }
 
     //temporary method

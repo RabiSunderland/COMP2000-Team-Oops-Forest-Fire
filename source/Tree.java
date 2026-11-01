@@ -22,6 +22,11 @@ public class Tree {
         changeState(TreeState.BURNED);
     }
 
+    /** The tree has finished burning by itself (as opposed to being put out). */
+    public void burnOut() {
+        changeState(TreeState.BURNED);
+    }
+
     public void regrow() {
         changeState(TreeState.GREEN);
     }
