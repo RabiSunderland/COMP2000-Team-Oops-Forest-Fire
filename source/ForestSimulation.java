@@ -1,10 +1,12 @@
 import java.awt.BorderLayout;
 import java.awt.event.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Logger;
 import javax.swing.JFrame;
 import javax.swing.Timer;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.logging.Logger;
 
 public class ForestSimulation implements KeyListener {
 
@@ -14,7 +16,13 @@ public class ForestSimulation implements KeyListener {
     private Forest forest;
     private Fire fire;
     private Water water;
-    // private Wind wind;
+    private Wind wind;
+
+    // Two interchangeable spread strategies; 'W' swaps between them while
+    // the simulation is running.
+    private SpreadRule calmRule;
+    private SpreadRule windyRule;
+    private boolean windEnabled = true;
 
     private ForestPanel panel;
     private StatsPanel stats;
@@ -22,12 +30,17 @@ public class ForestSimulation implements KeyListener {
     private Timer fireTimer;
     private Timer waterTimer;
     private Timer regrowthTimer;
+    private Timer windTimer;
+    private Timer lightningTimer;
 
     // How often the fire advances, in milliseconds. Slower than a redraw
     // tick so the spread is watchable rather than instant.
     private static final int FIRE_STEP_MS = 2000;
 
     private static final int WATER_RECHARGE_MS = 2000; // 1 second
+    private static final double BASE_SPREAD_CHANCE = 0.25;
+    private static final int WIND_SHIFT_MS = 8000;
+    private static final int LIGHTNING_MS = 10000;
 
     private Map<Tree, Long> regrowingTrees = new HashMap<>();
     public static final int REGROWTH_CHECK_MS = 100;
@@ -40,13 +53,15 @@ public class ForestSimulation implements KeyListener {
         // forest
         forest = createForest(rows, columns);
         // objects
-        fire = new Fire();
+        wind = new Wind();
+        calmRule = SpreadRule.constant(BASE_SPREAD_CHANCE).scaledBy(SpreadRule.BY_SPECIES);
+        windyRule = calmRule.scaledBy(wind);
+        fire = new Fire(windyRule);
         water = new Water(0, 0);
-        // wind = new Wind();
 
         // GUI
         panel = new ForestPanel(forest, water);
-        stats = new StatsPanel(forest, () -> "");
+        stats = new StatsPanel(forest, this::windStatus);
         frame = new JFrame("Forest Simulation");
 
         frame.add(stats, BorderLayout.NORTH);
@@ -59,9 +74,17 @@ public class ForestSimulation implements KeyListener {
         frame.setFocusable(true);
         frame.setVisible(true);
 
+        // Observer: when a tree burns out by itself, schedule it to regrow.
+        // (Water-extinguished trees are scheduled directly in useWater.)
+        forest.addListener(event -> {
+            if (event.type() == ForestEvent.Type.BURNED_OUT) {
+                scheduleRegrowth(event.tree());
+            }
+        });
+
         // Advance the fire on a timer rather than only when a key is
         // pressed, so it spreads on its own while the player is moving
-        // water around. fire.spread() is currently a stub
+        // water around.
         fireTimer = new Timer(FIRE_STEP_MS, e -> {
             fire.spread(forest);
             panel.repaint();
@@ -69,6 +92,18 @@ public class ForestSimulation implements KeyListener {
         fireTimer.start();
         startRegrowthTimer();
         startRandomFire();
+
+        // The wind changes direction every so often...
+        windTimer = new Timer(WIND_SHIFT_MS, e -> {
+            wind.shiftRandomly();
+            stats.refresh();
+        });
+        windTimer.start();
+
+        // ...and lightning keeps starting new fires, so the forest never
+        // settles: it burns, regrows and burns again.
+        lightningTimer = new Timer(LIGHTNING_MS, e -> startRandomFire());
+        lightningTimer.start();
 
         forest.printTreeSpecies(); // Print the species of each tree in the forest
 
@@ -105,6 +140,7 @@ public class ForestSimulation implements KeyListener {
                     if(currentTime >= regrowthDeadLine){
                         if (tree.isBurned()){
                             tree.regrow();
+                            forest.reportRegrown(tree);
                         }
                         return true; 
                     }
@@ -115,24 +151,31 @@ public class ForestSimulation implements KeyListener {
             regrowthTimer.start();
     }
 
+    /** Lightning: ignites one randomly chosen green tree (if any are left). */
     public void startRandomFire() {
-        // Start a random fire in the forest
-        int row = (int) (Math.random() * forest.getRows());
-        int col = (int) (Math.random() * forest.getColumns());
+        List<GridCell<Tree>> greenTrees = forest.cells()
+                .filter(cell -> cell.value().isGreen())
+                .toList();
 
-        try {
-            Tree tree = forest.getTree(row, col);
-            fire.startFire(tree);
-            forest.reportBurning(tree);
-            System.out.println("Random fire started at (" + row + ", " + col + ")");
-        } catch (InvalidGridPositionException e) {
-            // Should not happen since row/col are generated from the
-            // forest's own dimensions, but handled defensively in case
-            // that generation logic ever changes.
-            System.out.println("Could not start fire: " + e.getMessage());
+        if (greenTrees.isEmpty()) {
+            return; // nothing left to burn
         }
 
-        panel.repaint();
+        GridCell<Tree> target = greenTrees.get(
+                ThreadLocalRandom.current().nextInt(greenTrees.size()));
+        fire.startFire(target.value());
+        forest.reportBurning(target.value());
+        LOGGER.info("Lightning struck (" + target.row() + ", " + target.col() + ")");
+    }
+
+    private String windStatus() {
+        return windEnabled ? wind.describe() : "Wind: off (press W)";
+    }
+
+    /** Queues a burned tree to grow back after its species' regrowth time. */
+    private void scheduleRegrowth(Tree tree) {
+        long regrowthTimeNs = tree.getRegrowthTime() * 1_000_000_000L; // seconds to nanoseconds
+        regrowingTrees.put(tree, System.nanoTime() + regrowthTimeNs);
     }
 
     // WATER
@@ -145,10 +188,7 @@ public class ForestSimulation implements KeyListener {
             if (water.extinguish(tree)) {
                 forest.reportExtinguished(tree);
 
-                long regrowthTimeNs = tree.getRegrowthTime() * 1_000_000_000L; // Convert seconds to nanoseconds
-                long deadline = System.nanoTime() + regrowthTimeNs;
-                regrowingTrees.put(tree, deadline);
-
+                scheduleRegrowth(tree);
 
                 startWaterRecharge();
             }
@@ -184,9 +224,18 @@ public class ForestSimulation implements KeyListener {
             moveWater("RIGHT");
         } else if (e.getKeyCode() == KeyEvent.VK_SPACE) {
             useWater();
+        } else if (e.getKeyCode() == KeyEvent.VK_W) {
+            toggleWind();
         }
 
         panel.repaint();
+    }
+
+    /** Swaps the fire's spread strategy at runtime. */
+    private void toggleWind() {
+        windEnabled = !windEnabled;
+        fire.setRule(windEnabled ? windyRule : calmRule);
+        stats.refresh();
     }
 
     @Override
