@@ -6,7 +6,7 @@ public class Pine extends Tree {
 
     @Override
     public double getIgnitionMultiplier() {
-        return 1.0; // Pine trees are more flammable than generic trees
+        return 1.2; // Pine trees are more flammable than generic trees
     }
 
     @Override 
