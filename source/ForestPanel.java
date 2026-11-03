@@ -1,21 +1,17 @@
 import java.awt.*;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import javax.swing.*;
 
-public class ForestPanel extends JPanel{
+public class ForestPanel extends JPanel {
     private Forest forest;
     private Water water;
 
     private final int CELL_SIZE = 80; // Size of each cell in the grid
 
-        // Normal state palette
+    // Normal state palette
     private static final Color[] TREE_GREEN = {
-        Color.decode("#355432"), Color.decode("#64945f"), Color.decode("#1b3618")
+            Color.decode("#355432"), Color.decode("#64945f"), Color.decode("#1b3618")
     };
     private static final Color GROUND_GREEN = Color.decode("#306b2a");
     private static final Color GROUND_BROWN = Color.decode("#302016");
@@ -28,7 +24,6 @@ public class ForestPanel extends JPanel{
     private static final Color FIRE_COLOR = Color.decode("#911d10");
     private static final Color BURNED_TREE_COLOR = Color.decode("#211f1d");
     private static final Color WATER_COLOR = Color.decode("#1551a1");
-    private static final Color STATUS_TEXT_COLOR = Color.decode("#1b3618");
 
     // One way of drawing a cell for each tree state
     @FunctionalInterface
@@ -46,31 +41,32 @@ public class ForestPanel extends JPanel{
         painters.put(TreeState.BURNING, this::paintBurning);
         painters.put(TreeState.BURNED, this::paintBurned);
 
+        // Observer: redraw whenever the forest reports a change, instead of
+        // relying on whoever caused the change to remember to call repaint().
+        forest.addListener(event -> repaint());
+
         setPreferredSize(new Dimension(
-            forest.getColumns() * CELL_SIZE,
-            forest.getRows() * CELL_SIZE + 40
-        ));
+                forest.getColumns() * CELL_SIZE,
+                forest.getRows() * CELL_SIZE + 40));
     }
 
     @Override
     protected void paintComponent(Graphics g0) {
-    super.paintComponent(g0);
-    Graphics2D g = (Graphics2D) g0;
+        super.paintComponent(g0);
+        Graphics2D g = (Graphics2D) g0;
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         drawForest(g);
         drawWater(g);
-        drawStatus(g);
+        drawRechargeBar(g);
     }
 
     private void drawForest(Graphics2D g) {
-        IntStream.range(0, forest.getRows()).forEach(row ->
-            IntStream.range(0, forest.getColumns()).forEach(col ->
-                treeAt(row, col).ifPresent(tree -> {
-                    painters.get(tree.getState()).paint(g, row, col);
+        forest.cells().forEach(cell -> {
+            painters.get(cell.value().getState()).paint(g, cell.row(), cell.col());
 
-                    g.setColor(new Color(0, 0, 0, 40));
-                    g.drawRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
-                })));
+            g.setColor(new Color(0, 0, 0, 40));
+            g.drawRect(cell.col() * CELL_SIZE, cell.row() * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
     }
 
     private void paintGreen(Graphics2D g, int row, int col) {
@@ -129,33 +125,28 @@ public class ForestPanel extends JPanel{
         g.fillOval(cx - diameter / 2, cy - diameter / 2, diameter, diameter);
     }
 
-    // Live count of trees in each state, shown in the strip under the grid
-    private void drawStatus(Graphics2D g) {
-        Map<TreeState, Long> counts = IntStream.range(0, forest.getRows())
-            .boxed()
-            .flatMap(row -> IntStream.range(0, forest.getColumns())
-                .mapToObj(col -> treeAt(row, col)))
-            .flatMap(Optional::stream)
-            .collect(Collectors.groupingBy(
-                Tree::getState,
-                () -> new EnumMap<>(TreeState.class),
-                Collectors.counting()));
+    private void drawRechargeBar(Graphics2D g) {
+        int width = 100;
+        int height = 20;
+        int x = (getWidth() - width) / 2;
+        int y = getHeight() - height - 10;
 
-        String status = Arrays.stream(TreeState.values())
-            .map(state -> state + ": " + counts.getOrDefault(state, 0L))
-            .collect(Collectors.joining("     "));
+        int progress = water.getRechargeProgress();
 
-        g.setColor(STATUS_TEXT_COLOR);
-        g.drawString(status, 10, forest.getRows() * CELL_SIZE + 25);
-    }
+        g.setColor(Color.LIGHT_GRAY);
+        g.fillRect(x, y, width, height);
 
-    private Optional<Tree> treeAt(int row, int col) {
-        try {
-            return Optional.of(forest.getTree(row, col));
-        } catch (InvalidGridPositionException e) {
-            System.out.println("Skipped drawing cell: " + e.getMessage());
-            return Optional.empty();
-        }
+        g.setColor(Color.BLUE);
+        g.fillRect(x, y, width * progress / 100, height);
+
+        g.setColor(Color.BLACK);
+        g.drawRect(x, y, width, height);
+
+        String label = water.isAvailable()
+                ? "Water Ready"
+                : "Recharging: " + progress + "%";
+
+        g.drawString(label, x + 8, y + 15);
     }
 
 }
