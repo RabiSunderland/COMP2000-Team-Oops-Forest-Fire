@@ -1,4 +1,6 @@
 import java.awt.*;
+import java.util.EnumMap;
+import java.util.Map;
 import javax.swing.*;
 
 public class ForestPanel extends JPanel {
@@ -23,9 +25,21 @@ public class ForestPanel extends JPanel {
     private static final Color BURNED_TREE_COLOR = Color.decode("#211f1d");
     private static final Color WATER_COLOR = Color.decode("#1551a1");
 
+    // One way of drawing a cell for each tree state
+    @FunctionalInterface
+    private interface CellPainter {
+        void paint(Graphics2D g, int row, int col);
+    }
+
+    private final Map<TreeState, CellPainter> painters = new EnumMap<>(TreeState.class);
+
     public ForestPanel(Forest forest, Water water) {
         this.forest = forest;
         this.water = water;
+
+        painters.put(TreeState.GREEN, this::paintGreen);
+        painters.put(TreeState.BURNING, this::paintBurning);
+        painters.put(TreeState.BURNED, this::paintBurned);
 
         // Observer: redraw whenever the forest reports a change, instead of
         // relying on whoever caused the change to remember to call repaint().
@@ -47,52 +61,48 @@ public class ForestPanel extends JPanel {
     }
 
     private void drawForest(Graphics2D g) {
-        for (int row = 0; row < forest.getRows(); row++) {
-            for (int col = 0; col < forest.getColumns(); col++) {
-                try {
-                    Tree tree = forest.getTree(row, col);
-                    int x = col * CELL_SIZE;
-                    int y = row * CELL_SIZE;
-                    int cx = x + CELL_SIZE / 2;
-                    int cy = y + CELL_SIZE / 2;
+        forest.cells().forEach(cell -> {
+            painters.get(cell.value().getState()).paint(g, cell.row(), cell.col());
 
-                    int seed = (row * 31 + col * 17) % 100;
+            g.setColor(new Color(0, 0, 0, 40));
+            g.drawRect(cell.col() * CELL_SIZE, cell.row() * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+        });
+    }
 
-                    if (tree.getState() == TreeState.GREEN) {
-                        // Ground: 80% green / 20% brown
-                        g.setColor(seed < 80 ? GROUND_GREEN : GROUND_BROWN);
-                        g.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+    private void paintGreen(Graphics2D g, int row, int col) {
+        // Ground: 80% green / 20% brown
+        g.setColor(groundSeed(row, col) < 80 ? GROUND_GREEN : GROUND_BROWN);
+        g.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 
-                        // Tree: one of 3 greens, picked randomly per tree
-                        int treeSeed = (row * 13 + col * 7) % TREE_GREEN.length;
-                        g.setColor(TREE_GREEN[treeSeed]);
-                        int r = CELL_SIZE / 2 - 14;
-                        g.fillOval(cx - r, cy - r, r * 2, r * 2);
+        // Tree: one of 3 greens, picked randomly per tree
+        int treeSeed = (row * 13 + col * 7) % TREE_GREEN.length;
+        drawCircle(g, row, col, CELL_SIZE / 2 - 14, TREE_GREEN[treeSeed]);
+    }
 
-                    } else if (tree.getState() == TreeState.BURNING) {
-                        drawScorchedGround(g, x, y, seed);
-                        g.setColor(FIRE_COLOR);
-                        int r = CELL_SIZE / 2 - 14;
-                        g.fillOval(cx - r, cy - r, r * 2, r * 2);
+    private void paintBurning(Graphics2D g, int row, int col) {
+        drawScorchedGround(g, row, col);
+        drawCircle(g, row, col, CELL_SIZE / 2 - 14, FIRE_COLOR);
+    }
 
-                    } else if (tree.getState() == TreeState.BURNED) {
-                        drawScorchedGround(g, x, y, seed);
-                        int r = CELL_SIZE / 5;
-                        g.setColor(BURNED_TREE_COLOR);
-                        g.fillOval(cx - r, cy - r, r * 2, r * 2);
-                    }
+    private void paintBurned(Graphics2D g, int row, int col) {
+        drawScorchedGround(g, row, col);
+        drawCircle(g, row, col, CELL_SIZE / 5, BURNED_TREE_COLOR);
+    }
 
-                    g.setColor(new Color(0, 0, 0, 40));
-                    g.drawRect(x, y, CELL_SIZE, CELL_SIZE);
-                } catch (InvalidGridPositionException e) {
-                    System.out.println("Skipped drawing cell: " + e.getMessage());
-                }
-            }
-        }
+    private void drawCircle(Graphics2D g, int row, int col, int r, Color color) {
+        int cx = col * CELL_SIZE + CELL_SIZE / 2;
+        int cy = row * CELL_SIZE + CELL_SIZE / 2;
+        g.setColor(color);
+        g.fillOval(cx - r, cy - r, r * 2, r * 2);
+    }
+
+    private int groundSeed(int row, int col) {
+        return (row * 31 + col * 17) % 100;
     }
 
     // Shared by BURNING and BURNED: 10% dark / 80% ash / 10% ember
-    private void drawScorchedGround(Graphics2D g, int x, int y, int seed) {
+    private void drawScorchedGround(Graphics2D g, int row, int col) {
+        int seed = groundSeed(row, col);
         if (seed < 10) {
             g.setColor(SCORCHED_DARK);
         } else if (seed < 90) {
@@ -100,7 +110,7 @@ public class ForestPanel extends JPanel {
         } else {
             g.setColor(SCORCHED_EMBER);
         }
-        g.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+        g.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
     }
 
     private void drawWater(Graphics g) {
