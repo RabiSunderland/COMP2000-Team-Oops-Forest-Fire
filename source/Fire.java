@@ -1,110 +1,76 @@
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Fire {
 
-    private static final int BURN_DURATION_TICKS = 10;
-    private static final double SPREAD_CHANCE = 0.10;
+    // How many fire steps a tree burns for before it burns out by itself.
+    private static final int BURN_DURATION_TICKS = 2;
+    private static final double BASE_SPREAD_CHANCE = 0.25;
 
-    // up, down, left, right
-    private static final int[][] NEIGHBOUR_OFFSETS = { {-1, 0}, {1, 0}, {0, -1}, {0, 1} };
+    // Strategy: how likely the fire is to jump to a neighbour. Can be swapped
+    // while the simulation is running (see setRule).
+    private SpreadRule rule;
 
-    private final Map<Tree, Integer> burnTimers = new HashMap<>();
-    private final Random random = new Random();
+    // How long each currently burning tree has been burning, in fire steps.
+    private final Map<Tree, Integer> burnAge = new HashMap<>();
 
-    // Decides if a green neighbour catches fire. Passed in as behaviour so
-    // other rules (e.g. wind) can be plugged in without touching spread().
-    private Predicate<Tree> spreadRule = tree -> random.nextDouble() < SPREAD_CHANCE;
+    public Fire() {
+        this(SpreadRule.constant(BASE_SPREAD_CHANCE).scaledBy(SpreadRule.BY_SPECIES));
+    }
 
-    public void setSpreadRule(Predicate<Tree> spreadRule) {
-        this.spreadRule = spreadRule;
+    public Fire(SpreadRule rule) {
+        this.rule = Objects.requireNonNull(rule, "spread rule");
+    }
+
+    public void setRule(SpreadRule rule) {
+        this.rule = Objects.requireNonNull(rule, "spread rule");
     }
 
     public void startFire(Tree tree) {
-        if (tree.getState() == TreeState.GREEN) {
+
+        if (tree != null && tree.isGreen()) {
             tree.burn();
-            burnTimers.put(tree, BURN_DURATION_TICKS);
         }
     }
 
+    /**
+     * Advances the fire by one step: burning trees try to ignite their green
+     * neighbours, then every burning tree gets a step older and burns out
+     * once it reaches BURN_DURATION_TICKS.
+     */
     public void spread(Forest forest) {
-        List<Cell> burningCells = cells(forest)
-                .filter(cell -> treeAt(forest, cell)
-                        .map(tree -> tree.getState() == TreeState.BURNING)
-                        .orElse(false))
-                .collect(Collectors.toList());
+        // Snapshot first, so a tree that catches fire during this step does
+        // not also get to spread fire during the same step.
+        List<GridCell<Tree>> burning = forest.cells()
+                .filter(cell -> cell.value().isBurning())
+                .toList();
 
-        burningCells.forEach(cell ->
-                treeAt(forest, cell).ifPresent(tree -> burnTimers.putIfAbsent(tree, BURN_DURATION_TICKS)));
+        burning.forEach(from -> forest.neighbours(from.row(), from.col())
+                .filter(to -> to.value().isGreen())
+                .filter(to -> ThreadLocalRandom.current().nextDouble() < rule.chance(from, to))
+                .forEach(to -> ignite(forest, to.value())));
 
-        // Every burning tree gets its own chance on each neighbour, then
-        // all new fires start together so the order of the scan doesn't matter
-        List<Tree> newlyIgnited = burningCells.stream()
-                .flatMap(cell -> neighboursOf(forest, cell))
-                .filter(tree -> tree.getState() == TreeState.GREEN)
-                .filter(spreadRule)
-                .distinct()
-                .collect(Collectors.toList());
+        // Forget trees that the player put out with water.
+        burnAge.keySet().removeIf(tree -> !tree.isBurning());
 
-        newlyIgnited.forEach(tree -> {
-            tree.burn();
-            burnTimers.put(tree, BURN_DURATION_TICKS);
-            forest.reportBurning(tree);
-        });
-
-        burnTimers.replaceAll((tree, ticksLeft) -> ticksLeft - 1);
-
-        burnTimers.entrySet().stream()
-                .filter(entry -> entry.getValue() <= 0)
-                .map(Map.Entry::getKey)
-                .filter(tree -> tree.getState() == TreeState.BURNING)
-                .forEach(tree -> {
-                    tree.extinguish();
-                    forest.reportExtinguished(tree);
-                });
-
-        // Burned out, or put out by the water
-        burnTimers.keySet().removeIf(tree -> tree.getState() != TreeState.BURNING);
+        burning.forEach(cell -> age(forest, cell.value()));
     }
 
-    private Stream<Cell> cells(Forest forest) {
-        return IntStream.range(0, forest.getRows())
-                .boxed()
-                .flatMap(row -> IntStream.range(0, forest.getColumns())
-                        .mapToObj(col -> new Cell(row, col)));
+    private void ignite(Forest forest, Tree tree) {
+        startFire(tree);
+        forest.reportBurning(tree);
     }
 
-    private Stream<Tree> neighboursOf(Forest forest, Cell cell) {
-        return Stream.of(NEIGHBOUR_OFFSETS)
-                .map(offset -> new Cell(cell.row + offset[0], cell.col + offset[1]))
-                .map(neighbour -> treeAt(forest, neighbour))
-                .flatMap(Optional::stream);
-    }
+    private void age(Forest forest, Tree tree) {
+        int ticksBurning = burnAge.merge(tree, 1, Integer::sum);
 
-    // getTree throws a checked exception, which can't be thrown from inside a
-    // lambda, so off-grid positions become an empty Optional instead
-    private Optional<Tree> treeAt(Forest forest, Cell cell) {
-        try {
-            return Optional.of(forest.getTree(cell.row, cell.col));
-        } catch (InvalidGridPositionException e) {
-            return Optional.empty();
-        }
-    }
-
-    private static class Cell {
-        private final int row;
-        private final int col;
-
-        Cell(int row, int col) {
-            this.row = row;
-            this.col = col;
+        if (ticksBurning >= BURN_DURATION_TICKS) {
+            tree.burnOut();
+            burnAge.remove(tree);
+            forest.reportBurnedOut(tree);
         }
     }
 }
