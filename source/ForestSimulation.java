@@ -37,18 +37,14 @@ public class ForestSimulation implements KeyListener {
     // tick so the spread is watchable rather than instant.
     private static final int FIRE_STEP_MS = 2000;
 
-<<<<<<< HEAD
-    private static final int WATER_RECHARGE_MS = 2000; // 2 second
-=======
-    private static final int WATER_RECHARGE_MS = 2000; // 1 second
+    private static final int WATER_RECHARGE_MS = 20000; // 20 seconds
     private static final double BASE_SPREAD_CHANCE = 0.25;
     private static final int WIND_SHIFT_MS = 8000;
     private static final int LIGHTNING_MS = 10000;
->>>>>>> 4845cda075949f3dabeeab37ba3d3509a6120995
 
     private Map<Tree, Long> regrowingTrees = new HashMap<>();
     public static final int REGROWTH_CHECK_MS = 100;
-    
+
     public ForestSimulation() {
         this(DEFAULT_SIZE, DEFAULT_SIZE);
     }
@@ -133,26 +129,26 @@ public class ForestSimulation implements KeyListener {
         }
     }
 
-    private void startRegrowthTimer(){
-        regrowthTimer = new Timer(REGROWTH_CHECK_MS, e ->{
+    private void startRegrowthTimer() {
+        regrowthTimer = new Timer(REGROWTH_CHECK_MS, e -> {
             long currentTime = System.nanoTime();
 
-                regrowingTrees.entrySet().removeIf(entry -> {
-                    Tree tree = entry.getKey();
-                    long regrowthDeadLine = entry.getValue();
+            regrowingTrees.entrySet().removeIf(entry -> {
+                Tree tree = entry.getKey();
+                long regrowthDeadLine = entry.getValue();
 
-                    if(currentTime >= regrowthDeadLine){
-                        if (tree.isBurned()){
-                            tree.regrow();
-                            forest.reportRegrown(tree);
-                        }
-                        return true; 
+                if (currentTime >= regrowthDeadLine) {
+                    if (tree.isBurned()) {
+                        tree.regrow();
+                        forest.reportRegrown(tree);
                     }
-                    return false;
-                });
-                panel.repaint();
+                    return true;
+                }
+                return false;
             });
-            regrowthTimer.start();
+            panel.repaint();
+        });
+        regrowthTimer.start();
     }
 
     /** Lightning: ignites one randomly chosen green tree (if any are left). */
@@ -278,9 +274,6 @@ public class ForestSimulation implements KeyListener {
         waterTimer.start();
 
     }
-
-
-
 
     /**
      * Optional arguments: [rows] [columns], e.g. "java ForestSimulation 8 10".
