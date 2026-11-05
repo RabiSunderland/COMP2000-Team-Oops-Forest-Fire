@@ -41,7 +41,7 @@ public class ForestSimulation implements KeyListener {
     private static final double BASE_SPREAD_CHANCE = 0.25;
     private static final int WIND_SHIFT_MS = 8000;
     private static final int LIGHTNING_MS = 10000;
-    
+
     private Map<Tree, Long> regrowingTrees = new HashMap<>();
     public static final int REGROWTH_CHECK_MS = 100;
 
