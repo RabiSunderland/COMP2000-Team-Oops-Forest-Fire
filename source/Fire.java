@@ -1,17 +1,33 @@
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Fire {
 
-    // private static final int BURN_DURATION_TICKS = 10;
-    private static final double SPREAD_CHANCE = 0.25;
-    private final Random random = new Random();
+    // How many fire steps a tree burns for before it burns out by itself.
+    private static final int BURN_DURATION_TICKS = 2;
+    private static final double BASE_SPREAD_CHANCE = 0.25;
 
-    // private final Map<Tree, Integer> burnTimers = new HashMap<>();
-    // private final Random random = new Random();
+    // Strategy: how likely the fire is to jump to a neighbour. Can be swapped
+    // while the simulation is running (see setRule).
+    private SpreadRule rule;
+
+    // How long each currently burning tree has been burning, in fire steps.
+    private final Map<Tree, Integer> burnAge = new HashMap<>();
+
+    public Fire() {
+        this(SpreadRule.constant(BASE_SPREAD_CHANCE).scaledBy(SpreadRule.BY_SPECIES));
+    }
+
+    public Fire(SpreadRule rule) {
+        this.rule = Objects.requireNonNull(rule, "spread rule");
+    }
+
+    public void setRule(SpreadRule rule) {
+        this.rule = Objects.requireNonNull(rule, "spread rule");
+    }
 
     public void startFire(Tree tree) {
 
@@ -20,56 +36,41 @@ public class Fire {
         }
     }
 
+    /**
+     * Advances the fire by one step: burning trees try to ignite their green
+     * neighbours, then every burning tree gets a step older and burns out
+     * once it reaches BURN_DURATION_TICKS.
+     */
     public void spread(Forest forest) {
-        List<Tree> burningAtStart =
-                new ArrayList<>(forest.getBurningTrees());
+        // Snapshot first, so a tree that catches fire during this step does
+        // not also get to spread fire during the same step.
+        List<GridCell<Tree>> burning = forest.cells()
+                .filter(cell -> cell.value().isBurning())
+                .toList();
 
-        for (int row = 0; row < forest.getRows(); row++) {
-            for (int col = 0; col < forest.getColumns(); col++) {
+        burning.forEach(from -> forest.neighbours(from.row(), from.col())
+                .filter(to -> to.value().isGreen())
+                .filter(to -> ThreadLocalRandom.current().nextDouble() < rule.chance(from, to))
+                .forEach(to -> ignite(forest, to.value())));
 
-                Tree tree;
+        // Forget trees that the player put out with water.
+        burnAge.keySet().removeIf(tree -> !tree.isBurning());
 
-                try {
-                    tree = forest.getTree(row, col);
-                } catch (InvalidGridPositionException e) {
-                    continue;
-                }
-
-                if (!tree.isBurning()
-                        || !burningAtStart.contains(tree)) {
-                    continue;
-                }
-
-                // Try spreading in four directions
-                tryIgnite(forest, row - 1, col);
-                tryIgnite(forest, row + 1, col);
-                tryIgnite(forest, row, col - 1);
-                tryIgnite(forest, row, col + 1);
-            }
-        }
+        burning.forEach(cell -> age(forest, cell.value()));
     }
 
+    private void ignite(Forest forest, Tree tree) {
+        startFire(tree);
+        forest.reportBurning(tree);
+    }
 
+    private void age(Forest forest, Tree tree) {
+        int ticksBurning = burnAge.merge(tree, 1, Integer::sum);
 
-    private void tryIgnite(Forest forest, int row, int col) {
-        if (row < 0 || row >= forest.getRows()
-                || col < 0 || col >= forest.getColumns()) {
-            return;
-        }
-
-        try {
-            Tree neighbour = forest.getTree(row, col);
-
-            if (neighbour.isGreen()
-                    && random.nextDouble() < SPREAD_CHANCE) {
-
-                startFire(neighbour);
-                forest.reportBurning(neighbour);
-                System.out.println("Fire spread to (" + row + ", " + col + ")");
-            }
-
-        } catch (InvalidGridPositionException e) {
-            System.out.println(e.getMessage());
+        if (ticksBurning >= BURN_DURATION_TICKS) {
+            tree.burnOut();
+            burnAge.remove(tree);
+            forest.reportBurnedOut(tree);
         }
     }
 }

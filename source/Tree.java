@@ -1,10 +1,17 @@
-// Represents a tree and controls its current state.
+import java.util.ArrayList;
+import java.util.List;
+
+// represents a tree and controls its current state.
 public class Tree {
 
     private TreeState state;
 
+    // keeps track of the tree's previous states.
+    private final List<TreeState> stateHistory = new ArrayList<>();
+
     public Tree() {
         state = TreeState.GREEN;
+        stateHistory.add(state);
     }
 
     public void burn() {
@@ -12,6 +19,11 @@ public class Tree {
     }
 
     public void extinguish() {
+        changeState(TreeState.BURNED);
+    }
+
+    /** The tree has finished burning by itself (as opposed to being put out). */
+    public void burnOut() {
         changeState(TreeState.BURNED);
     }
 
@@ -26,6 +38,7 @@ public class Tree {
     private void changeState(TreeState newState) {
         if (state.canTransitionTo(newState)) {
             state = newState;
+            stateHistory.add(state);
         }
     }
 
@@ -45,12 +58,23 @@ public class Tree {
         return state;
     }
 
-    public String getSpecies(){
+    // returns a copy of tree state history meh.
+    public List<TreeState> getStateHistory() {
+        return new ArrayList<>(stateHistory);
+    }
+
+    // uses stream to count.
+    public long getTimesBurned() {
+        return stateHistory.stream()
+                .filter(s -> s == TreeState.BURNING)
+                .count();
+    }
+
+    public String getSpecies() {
         return "Tree";
     }
 
-    public double getIgnitionMultiplier(){
+    public double getIgnitionMultiplier() {
         return 1.0;
     }
-
 }
