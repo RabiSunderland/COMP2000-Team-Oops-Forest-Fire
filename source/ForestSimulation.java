@@ -21,7 +21,7 @@ public class ForestSimulation implements KeyListener {
     // tick so the spread is watchable rather than instant.
     private static final int FIRE_STEP_MS = 2000;
 
-    private static final int WATER_RECHARGE_MS = 2000; // 1 second
+    private static final int WATER_RECHARGE_MS = 2000; // 2 second
 
     private Map<Tree, Long> regrowingTrees = new HashMap<>();
     public static final int REGROWTH_CHECK_MS = 100;
