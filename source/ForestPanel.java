@@ -51,14 +51,36 @@ public class ForestPanel extends JPanel {
     }
 
     @Override
-    protected void paintComponent(Graphics g0) {
-        super.paintComponent(g0);
-        Graphics2D g = (Graphics2D) g0;
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        drawForest(g);
-        drawWater(g);
-        drawRechargeBar(g);
-    }
+	protected void paintComponent(Graphics g0) {
+    super.paintComponent(g0);
+
+    Graphics2D g = (Graphics2D) g0.create();
+    g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+            RenderingHints.VALUE_ANTIALIAS_ON);
+
+    //scales the forest to fit the window
+    int forestWidth = forest.getColumns() * CELL_SIZE;
+    int forestHeight = forest.getRows() * CELL_SIZE;
+    int availableHeight = Math.max(1, getHeight() - 40);
+
+    double scale = Math.min(
+            (double) getWidth() / forestWidth,
+            (double) availableHeight / forestHeight);
+
+    //keeps the forest centered
+    g.translate(
+            (getWidth() - forestWidth * scale) / 2,
+            (availableHeight - forestHeight * scale) / 2);
+
+    g.scale(scale, scale);
+
+    drawForest(g);
+    drawWater(g);
+    g.dispose();
+
+    //recharge bar
+    drawRechargeBar((Graphics2D) g0);
+}
 
     private void drawForest(Graphics2D g) {
         forest.cells().forEach(cell -> {

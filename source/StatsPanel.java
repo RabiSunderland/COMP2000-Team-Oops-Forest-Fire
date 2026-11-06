@@ -22,7 +22,7 @@ public class StatsPanel extends JPanel {
 
         setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
-        setPreferredSize(new Dimension(forest.getColumns() * 80, 50));
+        setPreferredSize(new Dimension(forest.getColumns() * 80, 70));
         add(label, BorderLayout.CENTER);
 
         forest.addListener(event -> refresh());
@@ -44,11 +44,12 @@ public class StatsPanel extends JPanel {
 				.sum();
 				
         String extra = extraStatus.get();
-        label.setText("<html>Green " + states.getOrDefault(TreeState.GREEN, 0L)
-                + "  |  Burning " + states.getOrDefault(TreeState.BURNING, 0L)
-                + "  |  Burned " + states.getOrDefault(TreeState.BURNED, 0L)
-				+ "  |  Total Fires " + totalFires
-                + (extra.isEmpty() ? "" : "  |  " + extra)
-                + "<br>Fuel left: " + fuel + "</html>");
+        label.setText("<html>"
+        + "🌳 Green: " + states.getOrDefault(TreeState.GREEN, 0L)
+        + "  |  🔥 Burning: " + states.getOrDefault(TreeState.BURNING, 0L)
+        + "  |  ⚫ Burned: " + states.getOrDefault(TreeState.BURNED, 0L)
+        + "  |  📊 Total Fires: " + totalFires
+        + (extra.isEmpty() ? "" : "<br>&#8776; " + extra)
+        + "</html>");
     }
 }
