@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class Fire {
 
     // How many fire steps a tree burns for before it burns out by itself.
-    private static final int BURN_DURATION_TICKS = 2;
+    private static final int BURN_DURATION_TICKS = 5;
     private static final double BASE_SPREAD_CHANCE = 0.25;
 
     // Strategy: how likely the fire is to jump to a neighbour. Can be swapped
