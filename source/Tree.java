@@ -31,6 +31,11 @@ public class Tree {
         changeState(TreeState.GREEN);
     }
 
+    /** Fire steps this tree burns for before burning out. */
+    public int getBurnDuration() {
+        return 3;
+    }
+
     public int getRegrowthTime() {
         return 20;
     }

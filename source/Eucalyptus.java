@@ -10,6 +10,11 @@ public class Eucalyptus extends Tree {
     }
 
     @Override
+    public int getBurnDuration() {
+        return 2; // burns hot and fast
+    }
+
+    @Override
     public int getRegrowthTime() {
         return 10; // Eucalyptus trees regrow faster than generic trees
     }

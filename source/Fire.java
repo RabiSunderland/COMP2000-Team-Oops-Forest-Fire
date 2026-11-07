@@ -6,8 +6,6 @@ import java.util.concurrent.ThreadLocalRandom;
 
 public class Fire {
 
-    // How many fire steps a tree burns for before it burns out by itself.
-    private static final int BURN_DURATION_TICKS = 5;
     private static final double BASE_SPREAD_CHANCE = 0.25;
 
     // Strategy: how likely the fire is to jump to a neighbour. Can be swapped
@@ -39,7 +37,7 @@ public class Fire {
     /**
      * Advances the fire by one step: burning trees try to ignite their green
      * neighbours, then every burning tree gets a step older and burns out
-     * once it reaches BURN_DURATION_TICKS.
+     * once it reaches its own burn duration.
      */
     public void spread(Forest forest) {
         // Snapshot first, so a tree that catches fire during this step does
@@ -67,7 +65,7 @@ public class Fire {
     private void age(Forest forest, Tree tree) {
         int ticksBurning = burnAge.merge(tree, 1, Integer::sum);
 
-        if (ticksBurning >= BURN_DURATION_TICKS) {
+        if (ticksBurning >= tree.getBurnDuration()) {
             tree.burnOut();
             burnAge.remove(tree);
             forest.reportBurnedOut(tree);

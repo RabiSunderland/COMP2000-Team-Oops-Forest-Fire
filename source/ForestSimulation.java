@@ -37,7 +37,7 @@ public class ForestSimulation implements KeyListener {
     // tick so the spread is watchable rather than instant.
     private static final int FIRE_STEP_MS = 2000;
 
-    private static final int WATER_RECHARGE_MS = 20000; // 20 seconds
+    private static final int WATER_RECHARGE_MS = 5000; // 5 seconds
     private static final double BASE_SPREAD_CHANCE = 0.25;
     private static final int WIND_SHIFT_MS = 8000;
     private static final int LIGHTNING_MS = 10000;

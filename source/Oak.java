@@ -10,6 +10,11 @@ public class Oak extends Tree {
     }
 
     @Override
+    public int getBurnDuration() {
+        return 4; // dense wood burns slowly
+    }
+
+    @Override
     public int getRegrowthTime() {
         return 25; // Oak trees take longer to regrow than generic trees
     }

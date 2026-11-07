@@ -9,7 +9,12 @@ public class Pine extends Tree {
         return 1.2; // Pine trees are more flammable than generic trees
     }
 
-    @Override 
+    @Override
+    public int getBurnDuration() {
+        return 3;
+    }
+
+    @Override
     public int getRegrowthTime() {
         return 15; // Pine trees regrow faster than generic trees
     }
