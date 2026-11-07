@@ -1,6 +1,5 @@
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.swing.BorderFactory;
@@ -30,26 +29,21 @@ public class StatsPanel extends JPanel {
     }
 
     public void refresh() {
-        Map<TreeState, Long> states = forest.countBy(Tree::getState);
+        // One pass over the forest (custom collector) instead of three.
+        ForestStats stats = forest.stats();
 
-        // Green trees by species = how much fuel of each kind is left.
-        String fuel = forest.countBy(Tree::isGreen, Tree::getSpecies)
-                .entrySet().stream()
+        String fuel = stats.getFuelBySpecies().entrySet().stream()
                 .map(e -> e.getKey() + " " + e.getValue())
                 .collect(Collectors.joining("  "));
-				
-		// Count the total number of times trees have caught fire.
-		long totalFires = forest.cells()
-				.mapToLong(cell -> cell.value().getTimesBurned())
-				.sum();
-				
+
         String extra = extraStatus.get();
         label.setText("<html>"
-        + "🌳 Green: " + states.getOrDefault(TreeState.GREEN, 0L)
-        + "  |  🔥 Burning: " + states.getOrDefault(TreeState.BURNING, 0L)
-        + "  |  ⚫ Burned: " + states.getOrDefault(TreeState.BURNED, 0L)
-        + "  |  📊 Total Fires: " + totalFires
-        + (extra.isEmpty() ? "" : "<br>&#8776; " + extra)
+        + "🌳 Green: " + stats.count(TreeState.GREEN)
+        + "  |  🔥 Burning: " + stats.count(TreeState.BURNING)
+        + "  |  ⚫ Burned: " + stats.count(TreeState.BURNED)
+        + "  |  📊 Total Fires: " + stats.getTotalFires()
+        + "<br>" + (extra.isEmpty() ? "" : "&#8776; " + extra + "  |  ")
+        + "🌲 Fuel: " + fuel
         + "</html>");
     }
 }

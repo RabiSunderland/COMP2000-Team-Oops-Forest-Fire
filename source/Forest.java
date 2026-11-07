@@ -73,6 +73,21 @@ public class Forest {
                         Collectors.counting()));
     }
 
+    /** Statistics for the whole forest, computed in a single pass. */
+    public ForestStats stats() {
+        return trees.cells()
+                .map(GridCell::value)
+                .collect(ForestStats.collector());
+    }
+
+    /** Same as stats() but on a parallel stream. */
+    public ForestStats statsParallel() {
+        return trees.cells()
+                .parallel()
+                .map(GridCell::value)
+                .collect(ForestStats.collector());
+    }
+
     /** Tells listeners that a tree has started burning. */
     public void reportBurning(Tree tree) {
         notifyListeners(ForestEvent.Type.IGNITED, tree);
