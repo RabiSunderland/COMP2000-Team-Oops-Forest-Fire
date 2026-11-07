@@ -13,6 +13,12 @@ public class ForestPanel extends JPanel {
     private static final Color[] TREE_GREEN = {
             Color.decode("#355432"), Color.decode("#64945f"), Color.decode("#1b3618")
     };
+    // One colour per species; unknown species fall back to TREE_GREEN.
+    private static final Map<String, Color> SPECIES_COLOR = Map.of(
+            "Pine", Color.decode("#1b3618"),
+            "Oak", Color.decode("#64945f"),
+            "Eucalyptus", Color.decode("#a3c9b0")
+    );
     private static final Color GROUND_GREEN = Color.decode("#306b2a");
     private static final Color GROUND_BROWN = Color.decode("#302016");
 
@@ -28,7 +34,7 @@ public class ForestPanel extends JPanel {
     // One way of drawing a cell for each tree state
     @FunctionalInterface
     private interface CellPainter {
-        void paint(Graphics2D g, int row, int col);
+        void paint(Graphics2D g, int row, int col, Tree tree);
     }
 
     private final Map<TreeState, CellPainter> painters = new EnumMap<>(TreeState.class);
@@ -84,29 +90,30 @@ public class ForestPanel extends JPanel {
 
     private void drawForest(Graphics2D g) {
         forest.cells().forEach(cell -> {
-            painters.get(cell.value().getState()).paint(g, cell.row(), cell.col());
+            painters.get(cell.value().getState()).paint(g, cell.row(), cell.col(), cell.value());
 
             g.setColor(new Color(0, 0, 0, 40));
             g.drawRect(cell.col() * CELL_SIZE, cell.row() * CELL_SIZE, CELL_SIZE, CELL_SIZE);
         });
     }
 
-    private void paintGreen(Graphics2D g, int row, int col) {
+    private void paintGreen(Graphics2D g, int row, int col, Tree tree) {
         // Ground: 80% green / 20% brown
         g.setColor(groundSeed(row, col) < 80 ? GROUND_GREEN : GROUND_BROWN);
         g.fillRect(col * CELL_SIZE, row * CELL_SIZE, CELL_SIZE, CELL_SIZE);
 
-        // Tree: one of 3 greens, picked randomly per tree
+        // Tree: coloured by species
         int treeSeed = (row * 13 + col * 7) % TREE_GREEN.length;
-        drawCircle(g, row, col, CELL_SIZE / 2 - 14, TREE_GREEN[treeSeed]);
+        drawCircle(g, row, col, CELL_SIZE / 2 - 14,
+                SPECIES_COLOR.getOrDefault(tree.getSpecies(), TREE_GREEN[treeSeed]));
     }
 
-    private void paintBurning(Graphics2D g, int row, int col) {
+    private void paintBurning(Graphics2D g, int row, int col, Tree tree) {
         drawScorchedGround(g, row, col);
         drawCircle(g, row, col, CELL_SIZE / 2 - 14, FIRE_COLOR);
     }
 
-    private void paintBurned(Graphics2D g, int row, int col) {
+    private void paintBurned(Graphics2D g, int row, int col, Tree tree) {
         drawScorchedGround(g, row, col);
         drawCircle(g, row, col, CELL_SIZE / 5, BURNED_TREE_COLOR);
     }
